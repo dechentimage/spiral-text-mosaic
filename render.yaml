@@ -1,0 +1,7 @@
+services:
+  - type: web
+    name: spiral-text-mosaic
+    env: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn webapp.app:create_app()
