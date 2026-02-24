@@ -38,7 +38,7 @@ from typing import List, Tuple
 
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
-from flask import Flask, request, render_template_string, send_from_directory, flash, redirect
+from flask import Flask, request, render_template_string, send_from_directory, flash, redirect, Response
 
 try:
     from sklearn.cluster import KMeans  # type: ignore
@@ -259,6 +259,37 @@ def create_spiral_text_mosaic_gif(
 
 def create_app() -> Flask:
     app = Flask(__name__)
+
+    # -----------------------------------------------------------------------
+    # Simple HTTP Basic authentication
+    #
+    # To prevent unauthorized access, the application requires clients to
+    # authenticate using HTTP Basic Auth.  The password is provided via the
+    # environment variable TOOL_PASSWORD (falling back to a default for local
+    # development).  Any username is accepted as long as the password matches.
+
+    PASSWORD = os.environ.get("TOOL_PASSWORD", "Orlando3")
+
+    def check_auth(auth) -> bool:
+        """Return True if the provided authentication is valid."""
+        return bool(auth) and auth.password == PASSWORD
+
+    def authenticate() -> Response:
+        """Return a 401 response prompting for basic auth."""
+        return Response(
+            "Authentication required", 401,
+            {"WWW-Authenticate": 'Basic realm="Login Required"'}
+        )
+
+    @app.before_request
+    def require_basic_auth():
+        """Ensure the client is authenticated for protected routes."""
+        # Allow access to static and generated GIF files without authentication
+        if request.path.startswith("/gif/") or request.path.startswith("/download/"):
+            return None
+        auth = request.authorization
+        if not check_auth(auth):
+            return authenticate()
     app.secret_key = os.environ.get("SECRET_KEY", uuid.uuid4().hex)
     upload_dir = Path(app.instance_path) / "uploads"
     gif_dir = Path(app.instance_path) / "gifs"
