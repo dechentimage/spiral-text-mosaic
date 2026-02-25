@@ -155,12 +155,21 @@ def _render_text_mask(text: str, block_size: int) -> Tuple[Image.Image, int, int
     """Render uppercase text into a binary mask and scale to mosaic resolution."""
     font = ImageFont.load_default()
     text = text.upper()
-    width_px, height_px = font.getsize(text)
+    # Compute text bounding box instead of getsize().
+    # FreeTypeFont objects in recent Pillow versions do not implement getsize(), so we
+    # call getbbox() to determine the width and height of the rendered text. The
+    # returned bounding box is a tuple (x0, y0, x1, y1).
+    bbox = font.getbbox(text)
+    width_px = bbox[2] - bbox[0]
+    height_px = bbox[3] - bbox[1]
+    # Create a 1-bit mask for the text using the computed size.
     mask = Image.new("1", (width_px, height_px), 0)
     draw = ImageDraw.Draw(mask)
     draw.text((0, 0), text, 1, font=font)
     width_cells = width_px
     height_cells = height_px
+    # Scale the mask up to the mosaic block resolution using nearest neighbour
+    # interpolation to preserve the pixelated look.
     scaled_mask = mask.resize((width_cells * block_size, height_cells * block_size), Image.NEAREST)
     return scaled_mask, width_cells, height_cells
 
